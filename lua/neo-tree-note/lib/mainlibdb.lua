@@ -4,18 +4,28 @@ local math = require("math")
 M.config = { working_dir = nil, uri = nil, db = nil }
 M.db = nil
 
+function reverse(t)
+	local n = #t
+	local i = 1
+	for i = 1, n do
+		t[i], t[n] = t[n], t[i]
+
+		n = n - 1
+	end
+end
+
 function M.find_virtual_uuid_path_of_article(article_uuid)
-	return M.db:with_open(function(db)
+	local path = M.db:with_open(function(db)
 		local r = db:eval(
 			[[
         select CAST(rid as text) as uuid from cat_article where aid = :article_uuid
         ]],
 			{ article_uuid = article_uuid }
 		)
-		local path = "" .. article_uuid
+		local path = { article_uuid }
 		while true do
 			if type(r) ~= "boolean" and r[1] ~= nil and r[1].uuid ~= nil then
-				path = r[1].uuid .. "/" .. path
+				path = table.insert(path, r[1].uuid)
 				r = db:eval([[
                 select CAST(pid as TEXT) as uuid from cat where uuid =
                 ]] .. r[1].uuid)
@@ -24,6 +34,27 @@ function M.find_virtual_uuid_path_of_article(article_uuid)
 			end
 		end
 		return path
+	end)
+	return reverse(path)
+end
+
+function M.find_virtual_uuid_path_of_cat(cat_uuid)
+	return M.db:with_open(function(db)
+		local path = { cat_uuid }
+		local r = db:eval([[
+                select CAST(pid as TEXT) as uuid from cat where uuid =
+                ]] .. cat_uuid)
+		while true do
+			if type(r) ~= "boolean" and r[1] ~= nil and r[1].uuid ~= nil then
+				path = table.insert(path, r[1].uuid)
+				r = db:eval([[
+                select CAST(pid as TEXT) as uuid from cat where uuid =
+                ]] .. r[1].uuid)
+			else
+				break
+			end
+		end
+		return reverse(path)
 	end)
 end
 
