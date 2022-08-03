@@ -37,8 +37,41 @@ M._navigate_internal = function(state, uuid, uuid_to_reveal, callback, async)
 	-- 	state.uuid = uuid
 	-- end
 	state.uuid_path = "0"
-	state.name_path = "/"
+	state.name = "/"
 	vfs_scan.get_items(state, nil, nil, uuid_to_reveal, callback)
+end
+
+M.toggle_category = function(state, node, path_to_reveal, skip_redraw, recursive)
+	log.debug("toggle_directory", state, node, path_to_reveal, skip_redraw, recursive)
+	local tree = state.tree
+	if not node then
+		node = tree:get_node()
+	end
+	if node.type ~= "directory" then
+		return
+	end
+	state.explicitly_opened_directories = state.explicitly_opened_directories or {}
+	if node.loaded == false then
+		local id = node:get_id()
+		state.explicitly_opened_directories[id] = true
+		renderer.position.set(state, nil)
+		vfs_scan.get_items(state, id, node.name, path_to_reveal, nil, false, recursive)
+	elseif node:has_children() then
+		local updated = false
+		if node:is_expanded() then
+			updated = node:collapse()
+			state.explicitly_opened_directories[node:get_id()] = false
+		else
+			updated = node:expand()
+			state.explicitly_opened_directories[node:get_id()] = true
+		end
+		if updated and not skip_redraw then
+			renderer.redraw(state)
+		end
+		if path_to_reveal then
+			renderer.focus_node(state, path_to_reveal)
+		end
+	end
 end
 
 ---Configures the plugin, should be called before the plugin is used.

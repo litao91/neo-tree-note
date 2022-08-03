@@ -4,6 +4,7 @@ local renderer = require("neo-tree.ui.renderer")
 local utils = require("neo-tree.utils")
 local mainlibdb = require("neo-tree-note.lib.mainlibdb")
 local log = require("neo-tree.log")
+local uv = vim.loop
 
 local sep = "/"
 
@@ -15,11 +16,38 @@ local on_category_loaded = function(context, uuid_path)
 	end
 end
 
-local function async_scan(context, uuid_path, name_path)
+local read_first_line = function(path)
+	local line = ""
+	local fd = uv.fs_open(path, "r", 438)
+	if not fd then
+		return ""
+	end
+	while true do
+		local buffer = uv.fs_read(fd, 100, -1)
+		if buffer == nil or buffer == "" then
+			return line
+		end
+		local pos = string.find(buffer, "\n")
+		if pos == nil then
+			line = line .. buffer
+		else
+			line = line .. string.sub(buffer, 1, pos - 1)
+			return line
+		end
+	end
+end
+
+local get_article_title = function(context, uuid)
+	local article_file_path = utils.path_join(context.state.working_dir, "docs", uuid .. ".md")
+	local title = read_first_line(article_file_path)
+	title = string.gsub(title, "^#+ ", "")
+	return title
+end
+
+local function async_scan(context, uuid_path, name)
 	log.trace("async_scan: ", uuid_path)
 	-- prepend the root path
-	table.insert(context.paths_to_load, 1, { uuid_path = uuid_path, name_path = name_path })
-	print(vim.inspect(context.paths_to_load))
+	table.insert(context.paths_to_load, 1, { uuid_path = uuid_path, name = name })
 
 	local categories_scanned = 0
 	local categories_to_scan = #context.paths_to_load
@@ -29,33 +57,33 @@ local function async_scan(context, uuid_path, name_path)
 	end)
 
 	-- from https://github.com/nvim-lua/plenary.nvim/blob/master/lua/plenary/scandir.lua
-	local function read_cat(current_uuid_path, current_name_path)
+	local function read_cat(current_uuid_path, current_name)
 		local _, cur_cat_uuid = utils.split_path(current_uuid_path)
 		local sub_cats = mainlibdb.get_cat_by_pid(cur_cat_uuid)
 		local sub_articles = mainlibdb.get_articles_by_cat(cur_cat_uuid)
 		for _, node in ipairs(sub_cats) do
 			local uuid_path_entry = current_uuid_path .. sep .. node.uuid
-			local name_path_entry = current_name_path .. sep .. node.name
 			if node.uuid ~= nil then
-				local success, item =
-					pcall(note_items.create_item, context, uuid_path_entry, name_path_entry, "directory")
+				local success, item = pcall(note_items.create_item, context, uuid_path_entry, node.name, "directory")
 				if success then
 					if context.recursive then
 						categories_to_scan = categories_to_scan + 1
-						read_cat(item.uuid_path, item.name_path)
+						read_cat(item.uuid_path, item.name)
 					end
 				else
-					log.error("Error creating item from ", current_name_path)
+					log.error("Error creating item from ", current_name)
 				end
 			end
 		end
 		for _, node in ipairs(sub_articles) do
-			local uuid_path_entry = current_uuid_path .. sep .. node.uuid
-			local name_path_entry = current_name_path .. sep .. node.name
-			if node.uuid ~= nil then
-				local success, _ = pcall(note_items.create_item, context, uuid_path_entry, name_path_entry, "file")
-				if not success then
-					log.error("Error creating item from ", current_name_path)
+			if node and node.uuid then
+				local uuid_path_entry = current_uuid_path .. sep .. node.uuid
+				if node.uuid ~= nil then
+					local title = get_article_title(context, node.uuid)
+					local success, _ = pcall(note_items.create_item, context, uuid_path_entry, title, "file")
+					if not success then
+						log.error("Error creating item from ", node.name)
+					end
 				end
 			end
 		end
@@ -72,22 +100,17 @@ local function async_scan(context, uuid_path, name_path)
 	--  log.error(first, ": ", err)
 	--end
 	for i = 1, categories_to_scan do
-		print(i)
-		read_cat(context.paths_to_load[i].uuid_path, context.paths_to_load[i].name_path)
+		read_cat(context.paths_to_load[i].uuid_path, context.paths_to_load[i].name)
 	end
 end
-M.get_items = function(state, parent_uuid_path, parent_name_path, uuid_to_reveal, callback, async, recursive)
+M.get_items = function(state, parent_uuid_path, parent_name, uuid_to_reveal, callback, async, recursive)
 	local context = note_items.create_context(state)
 	context.uuid_to_reveal = uuid_to_reveal
 	context.recursive = recursive
 
 	-- Create root folder
-	local root = note_items.create_item(
-		context,
-		parent_uuid_path or state.uuid_path,
-		parent_name_path or state.name_path,
-		"directory"
-	)
+	local root =
+		note_items.create_item(context, parent_uuid_path or state.uuid_path, parent_name or state.name, "directory")
 	root.loaded = true
 	root.search_pattern = state.search_pattern
 	context.categories[root.id] = root
@@ -98,7 +121,7 @@ M.get_items = function(state, parent_uuid_path, parent_name_path, uuid_to_reveal
 		note_items.deep_sort(root.children)
 		if parent_uuid_path then
 			-- lazy loading a child folder
-			renderer.show_nodes(root.children, state, parent_name_path, callback)
+			renderer.show_nodes(root.children, state, parent_uuid_path, callback)
 		else
 			-- full render of the tree
 			renderer.show_nodes({ root }, state, nil, callback)
@@ -110,12 +133,12 @@ M.get_items = function(state, parent_uuid_path, parent_name_path, uuid_to_reveal
 	else
 		-- In the case of a refresh or navigating up, we need to make sure that all
 		-- open folders are loaded.
-		local uuid_path = parent_uuid or state.uuid_path
-		local name_path = parent_name_path or state.name_path
+		local uuid_path = parent_uuid_path or state.uuid_path
+		local name = parent_name or state.name_path
 
 		-- init paths to load
 		context.paths_to_load = {}
-		if parent_uuid == nil then
+		if parent_uuid_path == nil then
 			if utils.truthy(state.force_open_folders) then
 				for _, f in ipairs(state.force_open_folders) do
 					table.insert(context.paths_to_load, f)
@@ -128,7 +151,7 @@ M.get_items = function(state, parent_uuid_path, parent_name_path, uuid_to_reveal
 				log.error("Unimplemented")
 			end
 		end
-		async_scan(context, uuid_path, name_path)
+		async_scan(context, uuid_path, name)
 	end
 end
 

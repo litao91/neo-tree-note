@@ -2,19 +2,17 @@ local utils = require("neo-tree.utils")
 
 local create_item, set_parents
 
-function create_item(context, uuid_path, name_path, _type)
+function create_item(context, uuid_path, name, _type)
 	local uuid_parent, uuid = utils.split_path(uuid_path)
 	if context.categories[uuid] then
 		return context.categories[uuid]
 	end
-	local name_parent, name = utils.split_path(name_path)
 	local item = {
 		id = uuid,
 		name = name,
 		uuid_parent = uuid_parent,
-		name_parent = name_parent,
 		uuid_path = uuid_path,
-		path = name_path,
+		path = uuid_path,
 		type = _type,
 	}
 	if item.type == "directory" then
