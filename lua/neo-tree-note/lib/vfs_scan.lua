@@ -37,8 +37,11 @@ local read_first_line = function(path)
 	end
 end
 
+local get_article_file_path = function(context, uuid)
+	return utils.path_join(context.state.working_dir, "docs", uuid .. ".md")
+end
 local get_article_title = function(context, uuid)
-	local article_file_path = utils.path_join(context.state.working_dir, "docs", uuid .. ".md")
+	local article_file_path = get_article_file_path(context, uuid)
 	local title = read_first_line(article_file_path)
 	title = string.gsub(title, "^#+ ", "")
 	return title
