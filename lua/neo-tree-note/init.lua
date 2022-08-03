@@ -38,7 +38,7 @@ M._navigate_internal = function(state, uuid, uuid_to_reveal, callback, async)
 	-- end
 	state.uuid_path = "0"
 	state.name_path = "/"
-	vfs_scan.get_items(state, nil, uuid_to_reveal, callback)
+	vfs_scan.get_items(state, nil, nil, uuid_to_reveal, callback)
 end
 
 ---Configures the plugin, should be called before the plugin is used.
