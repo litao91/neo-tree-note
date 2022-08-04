@@ -4,6 +4,9 @@ local utils = require("neo-tree.utils")
 local note = require("neo-tree-note")
 local renderer = require("neo-tree.ui.renderer")
 local note_utils = require("neo-tree-note.lib.utils")
+local mainlibdb = require("neo-tree-note.lib.mainlibdb")
+local inputs = require("neo-tree.ui.inputs")
+local luv = vim.loop
 
 local vim = vim
 
@@ -144,5 +147,58 @@ M.vsplit_with_window_picker = function(state)
 	end)
 end
 
-cc._add_common_commands(M)
+---Gets the node parent folder recursively
+---@param tree table to look for nodes
+---@param node table to look for folder parent
+---@return table table
+local function get_folder_node(tree, node)
+	if not node then
+		node = tree:get_node()
+	end
+	if node.type == "directory" then
+		return node
+	end
+	return get_folder_node(tree, tree:get_node(node:get_parent_id()))
+end
+
+local function create_article(working_dir, cat_uuid, name)
+	local uuid = mainlibdb.add_article(cat_uuid)
+	local file = utils.path_join(working_dir, "docs", uuid .. ".md")
+
+	if luv.fs_access(file, "r") ~= false then
+		print(file .. " already exists. Overwrite? y/n")
+		local ans = utils.get_user_input_char()
+		utils.clear_prompt()
+		if ans ~= "y" then
+			return
+		end
+	end
+	local fd = luv.fs_open(file, "w", 420)
+	luv.fs_write(fd, "# " .. name .. "\n")
+	luv.fs_close(fd)
+	return uuid
+end
+
+M.add = function(state, callback)
+	local tree = state.tree
+	local node = get_folder_node(tree)
+	local in_directory = node:get_id()
+	-- print(vim.inspect(in_directory))
+	-- print(vim.inspect(using_root_directory))
+	local path = mainlibdb.find_paths_to_cat_uuid(in_directory)
+	local uuid_path = path.uuid_path
+	local name_path = path.name_path
+	local base = table.concat(name_path, "/")
+
+	inputs.input('Enter name for new file or directory (dirs end with a "/"):', "", function(destination)
+		local is_cat = vim.endswith(destination, "/")
+		if is_cat then
+			mainlibdb.add_cat(in_directory, destination.sub(destination, 1, #destination - 1))
+		else
+			create_article(state.working_dir, in_directory, destination)
+		end
+	end)
+end
+
+-- cc._add_common_commands(M)
 return M

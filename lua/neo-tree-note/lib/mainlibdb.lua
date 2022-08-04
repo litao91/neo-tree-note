@@ -7,9 +7,9 @@ M.db = nil
 function reverse(t)
 	local n = #t
 	local i = 1
-	for i = 1, n do
+	while i < n do
 		t[i], t[n] = t[n], t[i]
-
+		i = i + 1
 		n = n - 1
 	end
 end
@@ -25,7 +25,7 @@ function M.find_virtual_uuid_path_of_article(article_uuid)
 		local path = { article_uuid }
 		while true do
 			if type(r) ~= "boolean" and r[1] ~= nil and r[1].uuid ~= nil then
-				path = table.insert(path, r[1].uuid)
+				table.insert(path, r[1].uuid)
 				r = db:eval([[
                 select CAST(pid as TEXT) as uuid from cat where uuid =
                 ]] .. r[1].uuid)
@@ -46,7 +46,7 @@ function M.find_virtual_uuid_path_of_cat(cat_uuid)
                 ]] .. cat_uuid)
 		while true do
 			if type(r) ~= "boolean" and r[1] ~= nil and r[1].uuid ~= nil then
-				path = table.insert(path, r[1].uuid)
+				table.insert(path, r[1].uuid)
 				r = db:eval([[
                 select CAST(pid as TEXT) as uuid from cat where uuid =
                 ]] .. r[1].uuid)
@@ -55,6 +55,34 @@ function M.find_virtual_uuid_path_of_cat(cat_uuid)
 			end
 		end
 		return reverse(path)
+	end)
+end
+
+function M.find_paths_to_cat_uuid(cat_uuid)
+	return M.db:with_open(function(db)
+		local r = db:eval([[
+                select CAST(pid as TEXT) as pid, name from cat where uuid =
+                ]] .. cat_uuid)
+		local uuid_path = { cat_uuid }
+		local name_path = {}
+
+		while true do
+			if type(r) ~= "boolean" and r[1] ~= nil and r[1].name ~= nil then
+				table.insert(name_path, r[1].name)
+			end
+
+			if type(r) ~= "boolean" and r[1] ~= nil and r[1].pid ~= nil then
+				table.insert(uuid_path, r[1].pid)
+				r = db:eval([[
+                select CAST(pid as TEXT) as pid, name from cat where uuid =
+                ]] .. r[1].pid)
+			else
+				break
+			end
+		end
+		reverse(uuid_path)
+		reverse(name_path)
+		return { uuid_path = uuid_path, name_path = name_path }
 	end)
 end
 
