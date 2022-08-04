@@ -2,6 +2,7 @@ local M = {}
 local note_items = require("neo-tree-note.lib.note-items")
 local renderer = require("neo-tree.ui.renderer")
 local utils = require("neo-tree.utils")
+local note_utils = require("neo-tree-note.lib.utils")
 local mainlibdb = require("neo-tree-note.lib.mainlibdb")
 local log = require("neo-tree.log")
 local uv = vim.loop
@@ -37,11 +38,8 @@ local read_first_line = function(path)
 	end
 end
 
-local get_article_file_path = function(context, uuid)
-	return utils.path_join(context.state.working_dir, "docs", uuid .. ".md")
-end
 local get_article_title = function(context, uuid)
-	local article_file_path = get_article_file_path(context, uuid)
+	local article_file_path = note_utils.get_article_file_path(context.state, uuid)
 	local title = read_first_line(article_file_path)
 	title = string.gsub(title, "^#+ ", "")
 	return title
