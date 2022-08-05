@@ -36,6 +36,7 @@ local read_first_line = function(path)
 			return line
 		end
 	end
+	uv.fs_close(fd)
 end
 
 local get_article_title = function(context, uuid)
