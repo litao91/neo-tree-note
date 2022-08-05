@@ -20,23 +20,27 @@ end
 local read_first_line = function(path)
 	local line = ""
 	local fd = uv.fs_open(path, "r", 438)
-	if not fd then
-		return ""
-	end
-	while true do
-		local buffer = uv.fs_read(fd, 100, -1)
-		if buffer == nil or buffer == "" then
-			return line
+	local read_inner = function(fd)
+		if not fd then
+			return ""
 		end
-		local pos = string.find(buffer, "\n")
-		if pos == nil then
-			line = line .. buffer
-		else
-			line = line .. string.sub(buffer, 1, pos - 1)
-			return line
+		while true do
+			local buffer = uv.fs_read(fd, 100, -1)
+			if buffer == nil or buffer == "" then
+				return line
+			end
+			local pos = string.find(buffer, "\n")
+			if pos == nil then
+				line = line .. buffer
+			else
+				line = line .. string.sub(buffer, 1, pos - 1)
+				return line
+			end
 		end
 	end
+	local line = read_inner(fd)
 	uv.fs_close(fd)
+	return line
 end
 
 local get_article_title = function(context, uuid)
