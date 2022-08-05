@@ -157,6 +157,7 @@ M.get_items = function(state, parent_uuid_path, parent_name, uuid_to_reveal, cal
 					uuid_path_to_reveal = mainlibdb.find_virtual_uuid_name_path_of_cat(cat_of_article)
 				else
 					uuid_path_to_reveal = mainlibdb.find_virtual_uuid_name_path_of_cat(uuid_to_reveal)
+					table.remove(uuid_path_to_reveal)
 				end
 				utils.reduce(uuid_path_to_reveal, "", function(acc, part)
 					local current_path = utils.path_join(acc, part.uuid)

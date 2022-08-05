@@ -48,7 +48,7 @@ function M.find_cat_of_article(article_uuid)
         ]],
 			{ article_uuid = article_uuid }
 		)
-		if r ~= nil and r[1] ~= nil then
+		if type(r) ~= "boolean" and r ~= nil and r[1] ~= nil then
 			return r[1].uuid
 		else
 			return nil
@@ -96,7 +96,8 @@ function M.find_virtual_uuid_path_of_cat(cat_uuid)
 				break
 			end
 		end
-		return reverse(path)
+		reverse(path)
+		return path
 	end)
 end
 
@@ -155,6 +156,9 @@ function M.has_inited()
 end
 
 function M.init(opts)
+	if M.db ~= nil then
+		return
+	end
 	M.config.working_dir = opts.working_dir
 	M.config.uri = opts.working_dir .. "/mainlib.db"
 	local luv = vim.loop
