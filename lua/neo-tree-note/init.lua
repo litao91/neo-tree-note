@@ -28,16 +28,11 @@ M._navigate_internal = function(state, uuid, uuid_to_reveal, callback, async)
 		return
 	end
 	log.trace("navigate_internal", state.current_position, uuid, uuid_to_reveal)
-	-- state.dirty = false
-	-- if uuid == nil then
-	-- 	log.debug("navigate_internal: uuid is nil, using root")
-	-- 	uuid = "0"
-	-- end
-	-- if uuid ~= state.uuid then
-	-- 	state.uuid = uuid
-	-- end
 	state.uuid_path = "0"
 	state.name = "/"
+	if uuid_to_reveal then
+		renderer.position.set(state, uuid_to_reveal)
+	end
 	vfs_scan.get_items(state, nil, nil, uuid_to_reveal, callback)
 end
 
