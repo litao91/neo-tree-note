@@ -49,7 +49,7 @@ local follow_internal = function(callback, force_show, async)
 	local _, uuid_to_reveal = utils.split_path(path_to_reveal)
 	uuid_to_reveal = string.sub(uuid_to_reveal, 1, #uuid_to_reveal - #".md")
 
-	local state =  get_state()
+	local state = get_state()
 	if state.current_position == "float" then
 		return false
 	end
@@ -109,6 +109,14 @@ local follow_internal = function(callback, force_show, async)
 	return true
 end
 
+M.follow = function()
+	if vim.fn.bufname(0) == "COMMIT_EDITMSG" then
+		return false
+	end
+	utils.debounce("neo-tree-buffer-follow", function()
+		return follow_internal()
+	end, 100, utils.debounce_strategy.CALL_LAST_ONLY)
+end
 ---Navigate to the given path.
 ---@param uuid string **id** to navigate to. If empty, will navigate to the root.
 M.navigate = function(state, uuid, uuid_to_reveal, callback, async)
@@ -193,6 +201,18 @@ M.setup = function(config, global_config)
 	local working_dir = config.working_dir or luv.working_dir
 	if not mainlibdb.init({ working_dir = working_dir }) then
 		log.error("Fail to init mainlibdb with working dir: " .. working_dir)
+	end
+
+	-- Configure event handler for follow_current_file option
+	if config.follow_current_file then
+		manager.subscribe(M.name, {
+			event = events.VIM_BUFFER_ENTER,
+			handler = M.follow,
+		})
+		manager.subscribe(M.name, {
+			event = events.VIM_TERMINAL_ENTER,
+			handler = M.follow,
+		})
 	end
 end
 
