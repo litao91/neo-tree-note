@@ -1,7 +1,7 @@
 local sqlite = require("sqlite.db")
 local M = {}
 local math = require("math")
-local note_utils = require"neo-tree-note.lib.utils"
+local note_utils = require("neo-tree-note.lib.utils")
 M.config = { working_dir = nil, uri = nil, db = nil }
 M.db = nil
 
@@ -18,11 +18,11 @@ end
 function M.get_node_type(uuid)
 	return M.db:with_open(function(db)
 		local r1 = db:eval("select count(*) as cnt from cat where uuid = ?", uuid)
-		if r1.cnt > 0 then
+		if r1 ~= nil and r1[1] ~= nil and r1[1].cnt > 0 then
 			return "directory"
 		end
 		local r2 = db:eval("select count(*) as cnt from article where uuid = ?", uuid)
-		if r2.cnt > 0 then
+		if r2 ~= nil and r2[1] ~= nil and r2[1].cnt > 0 then
 			return "file"
 		end
 		return nil
@@ -40,6 +40,22 @@ function M.find_virtual_uuid_path(uuid)
 	end
 end
 
+function M.find_cat_of_article(article_uuid)
+	return M.db:with_open(function(db)
+		local r = db:eval(
+			[[
+        select CAST(rid as text) as uuid from cat_article where aid = :article_uuid
+        ]],
+			{ article_uuid = article_uuid }
+		)
+		if r ~= nil and r[1] ~= nil then
+			return r[1].uuid
+		else
+			return nil
+		end
+	end)
+end
+
 function M.find_virtual_uuid_path_of_article(article_uuid)
 	local path = M.db:with_open(function(db)
 		local r = db:eval(
@@ -48,7 +64,7 @@ function M.find_virtual_uuid_path_of_article(article_uuid)
         ]],
 			{ article_uuid = article_uuid }
 		)
-		local path = { {uuid = article_uuid, name = ""} }
+		local path = { { uuid = article_uuid, name = "" } }
 		while true do
 			if type(r) ~= "boolean" and r[1] ~= nil and r[1].uuid ~= nil then
 				table.insert(path, r[1].uuid)
@@ -81,6 +97,28 @@ function M.find_virtual_uuid_path_of_cat(cat_uuid)
 			end
 		end
 		return reverse(path)
+	end)
+end
+
+function M.find_virtual_uuid_name_path_of_cat(cat_uuid)
+	return M.db:with_open(function(db)
+		local r = db:eval([[
+                select CAST(pid as TEXT) as pid, name from cat where uuid =
+                ]] .. cat_uuid)
+		local path = { { uuid = cat_uuid } }
+		while true do
+			if type(r) ~= "boolean" and r[1] ~= nil and r[1].pid ~= nil then
+				path[#path].name = r[1].name
+				table.insert(path, { uuid = r[1].pid })
+				r = db:eval([[
+                select CAST(pid as TEXT) as pid, name from cat where uuid =
+                ]] .. r[1].pid)
+			else
+				break
+			end
+		end
+		reverse(path)
+		return path
 	end)
 end
 
@@ -317,7 +355,9 @@ WHERE cat.uuid = ? ORDER BY article.sort desc]],
 end
 
 local function gen_uuid()
-	return (os.time(os.date("!*t")) * 10000 + math.random(10000, 99999))
+	local s, ns = vim.loop.gettimeofday()
+	local ms = s * 1000 + math.floor(ns / 1000)
+	return "" .. ms
 end
 
 function M.add_cat(pid, cat_name)

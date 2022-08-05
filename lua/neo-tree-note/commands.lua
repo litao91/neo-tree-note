@@ -187,15 +187,16 @@ M.add = function(state)
 
 	inputs.input('Enter name for new file or directory (dirs end with a "/"):', "", function(destination)
 		local is_cat = vim.endswith(destination, "/")
+		local dest_uuid
 		if is_cat then
-			mainlibdb.add_cat(in_directory, destination.sub(destination, 1, #destination - 1))
+			dest_uuid = mainlibdb.add_cat(in_directory, destination.sub(destination, 1, #destination - 1))
 		else
-			create_article(state.working_dir, in_directory, destination)
+			dest_uuid = create_article(state.working_dir, in_directory, destination)
 		end
 
 		vim.schedule(function()
-			events.fire_event(events.FILE_ADDED, destination)
-			note.show_new_children(state, destination)
+			events.fire_event(events.FILE_ADDED, dest_uuid)
+			note.navigate(state, nil, dest_uuid)
 		end)
 	end)
 end

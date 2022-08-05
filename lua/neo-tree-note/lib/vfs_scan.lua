@@ -150,13 +150,20 @@ M.get_items = function(state, parent_uuid_path, parent_name, uuid_to_reveal, cal
 				context.paths_to_load = renderer.get_expanded_nodes(state.tree, uuid)
 			end
 			if uuid_to_reveal then
-				local uuid_path_to_reveal = mainlibdb.find_virtual_uuid_path(uuid_to_reveal)
-				table.remove(uuid_path_to_reveal) -- remove the filename
+				local cat_of_article = mainlibdb.find_cat_of_article(uuid_to_reveal)
+				local is_article = cat_of_article ~= nil
+				local uuid_path_to_reveal
+				if is_article then
+					uuid_path_to_reveal = mainlibdb.find_virtual_uuid_name_path_of_cat(cat_of_article)
+				else
+					uuid_path_to_reveal = mainlibdb.find_virtual_uuid_name_path_of_cat(uuid_to_reveal)
+				end
 				utils.reduce(uuid_path_to_reveal, "", function(acc, part)
-					local current_path = utils.path_join(acc, part)
+					local current_path = utils.path_join(acc, part.uuid)
+					print(current_path)
 					if #current_path > #uuid_path then
-						table.insert(context.paths_to_load, current_path)
-						table.insert(state.default_expanded_nodes, current_path)
+						table.insert(context.paths_to_load, { uuid_path = current_path, name = part.name })
+						table.insert(state.default_expanded_nodes, { uuid_path = current_path, name = part.name })
 					end
 					return current_path
 				end)
