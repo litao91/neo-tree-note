@@ -13,6 +13,102 @@ local vfs_scan = require("neo-tree-note.lib.vfs_scan")
 
 local M = { name = "neo-tree-note" }
 
+local get_state = function(tabnr)
+	return manager.get_state(M.name, tabnr)
+end
+function string:endswith(ending)
+	return ending == "" or self:sub(-#ending) == ending
+end
+
+local test_is_in_path = function(lhs, rhs)
+	print(lhs, rhs)
+	if lhs == "0" then
+		return false
+	end
+	local uuid_path = mainlibdb.find_virtual_uuid_path(lhs)
+	for _, value in ipairs(uuid_path) do
+		if value == rhs then
+			return true
+		end
+	end
+	return false
+end
+
+local follow_internal = function(callback, force_show, async)
+	if vim.bo.filetype == "neo-tree" or vim.bo.filetype == "neo-tree-popup" then
+		return
+	end
+	local path_to_reveal = manager.get_path_to_reveal()
+	if not utils.truthy(path_to_reveal) then
+		return false
+	end
+
+	if not path_to_reveal:endswith(".md") then
+		return false
+	end
+	local _, uuid_to_reveal = utils.split_path(path_to_reveal)
+	uuid_to_reveal = string.sub(uuid_to_reveal, 1, #uuid_to_reveal - #".md")
+
+	local state =  get_state()
+	if state.current_position == "float" then
+		return false
+	end
+
+	if not state.uuid_path then
+		return false
+	end
+
+	local window_exists = renderer.window_exists(state)
+	if window_exists then
+		local node = state.tree and state.tree:get_node()
+		if node then
+			if node:get_id() == path_to_reveal then
+				-- already focused
+				return false
+			end
+		end
+	else
+		if not force_show then
+			return false
+		end
+	end
+
+	log.debug("following uuid: " .. uuid_to_reveal)
+	local show_only_explicitly_opened = function()
+		local eod = state.explicitly_opened_directories or {}
+		local expanded_nodes = renderer.get_expanded_nodes(state.tree)
+		local state_changed = false
+		for _, id in ipairs(expanded_nodes) do
+			local is_explicit = eod[id]
+			if not is_explicit then
+				local is_in_path = test_is_in_path(id, uuid_to_reveal)
+				if is_in_path then
+					is_explicit = true
+				end
+			end
+			if not is_explicit then
+				local node = state.tree:get_node(id)
+				if node then
+					node:collapse()
+					state_changed = true
+				end
+			end
+			if state_changed then
+				renderer.redraw(state)
+			end
+		end
+	end
+	state.position.is.restorable = false -- we will handle setting cursor position here
+	vfs_scan.get_items(state, nil, nil, uuid_to_reveal, function()
+		show_only_explicitly_opened()
+		renderer.focus_node(state, uuid_to_reveal, true)
+		if type(callback) == "function" then
+			callback()
+		end
+	end, async)
+	return true
+end
+
 ---Navigate to the given path.
 ---@param uuid string **id** to navigate to. If empty, will navigate to the root.
 M.navigate = function(state, uuid, uuid_to_reveal, callback, async)
@@ -27,13 +123,34 @@ M._navigate_internal = function(state, uuid, uuid_to_reveal, callback, async)
 		log.error("Unsupported, could start from the root only")
 		return
 	end
+	state.dirty = false
+	local is_search = utils.truthy(state.search_pattern)
 	log.trace("navigate_internal", state.current_position, uuid, uuid_to_reveal)
 	state.uuid_path = "0"
 	state.name = "/"
 	if uuid_to_reveal then
 		renderer.position.set(state, uuid_to_reveal)
+		vfs_scan.get_items(state, nil, nil, uuid_to_reveal, callback)
+	else
+		local is_current = state.current_position == "current"
+		local follow_file = state.follow_current_file
+			and not is_search
+			and not is_current
+			and manager.get_path_to_reveal()
+		local handled = false
+		if utils.truthy(follow_file) then
+			handled = follow_internal(callback, true, async)
+		end
+		if not handled then
+			local success, msg = pcall(renderer.position.save, state)
+			if success then
+				log.trace("navigate_internal: position saved")
+			else
+				log.trace("navigate_internal: FAILED to save position: ", msg)
+			end
+			vfs_scan.get_items(state, nil, nil, nil, callback)
+		end
 	end
-	vfs_scan.get_items(state, nil, nil, uuid_to_reveal, callback)
 end
 
 M.toggle_category = function(state, node, path_to_reveal, skip_redraw, recursive)

@@ -166,7 +166,6 @@ M.get_items = function(state, parent_uuid_path, parent_name, uuid_to_reveal, cal
 				end
 				utils.reduce(uuid_path_to_reveal, "", function(acc, part)
 					local current_path = utils.path_join(acc, part.uuid)
-					print(current_path)
 					if #current_path > #uuid_path then
 						table.insert(context.paths_to_load, { uuid_path = current_path, name = part.name })
 						table.insert(state.default_expanded_nodes, { uuid_path = current_path, name = part.name })
