@@ -1,6 +1,7 @@
 local sqlite = require("sqlite.db")
 local M = {}
 local math = require("math")
+local note_utils = require"neo-tree-note.lib.utils"
 M.config = { working_dir = nil, uri = nil, db = nil }
 M.db = nil
 
@@ -14,6 +15,31 @@ function reverse(t)
 	end
 end
 
+function M.get_node_type(uuid)
+	return M.db:with_open(function(db)
+		local r1 = db:eval("select count(*) as cnt from cat where uuid = ?", uuid)
+		if r1.cnt > 0 then
+			return "directory"
+		end
+		local r2 = db:eval("select count(*) as cnt from article where uuid = ?", uuid)
+		if r2.cnt > 0 then
+			return "file"
+		end
+		return nil
+	end)
+end
+
+function M.find_virtual_uuid_path(uuid)
+	local type = M.get_node_type(uuid)
+	if type == "directory" then
+		return M.find_virtual_uuid_path_of_cat(uuid)
+	elseif type == "file" then
+		return M.find_virtual_uuid_path_of_article(uuid)
+	else
+		return nil
+	end
+end
+
 function M.find_virtual_uuid_path_of_article(article_uuid)
 	local path = M.db:with_open(function(db)
 		local r = db:eval(
@@ -22,12 +48,12 @@ function M.find_virtual_uuid_path_of_article(article_uuid)
         ]],
 			{ article_uuid = article_uuid }
 		)
-		local path = { article_uuid }
+		local path = { {uuid = article_uuid, name = ""} }
 		while true do
 			if type(r) ~= "boolean" and r[1] ~= nil and r[1].uuid ~= nil then
 				table.insert(path, r[1].uuid)
 				r = db:eval([[
-                select CAST(pid as TEXT) as uuid from cat where uuid =
+                select CAST(pid as TEXT) as uuid, name from cat where uuid =
                 ]] .. r[1].uuid)
 			else
 				break
@@ -248,7 +274,7 @@ SELECT
     buildResource,
     postExtValue,
     isTop
-FROM cat
+FROM article
 WHERE uuid = ? ORDER BY article.sort desc]],
 			aid
 		)

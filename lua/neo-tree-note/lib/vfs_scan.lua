@@ -104,6 +104,7 @@ local function async_scan(context, uuid_path, name)
 		read_cat(context.paths_to_load[i].uuid_path, context.paths_to_load[i].name)
 	end
 end
+
 M.get_items = function(state, parent_uuid_path, parent_name, uuid_to_reveal, callback, async, recursive)
 	local context = note_items.create_context(state)
 	context.uuid_to_reveal = uuid_to_reveal
@@ -149,7 +150,17 @@ M.get_items = function(state, parent_uuid_path, parent_name, uuid_to_reveal, cal
 				context.paths_to_load = renderer.get_expanded_nodes(state.tree, uuid)
 			end
 			if uuid_to_reveal then
-				log.error("Unimplemented")
+				local uuid_path_to_reveal = mainlibdb.find_virtual_uuid_path(uuid_to_reveal)
+				table.remove(uuid_path_to_reveal) -- remove the filename
+				utils.reduce(uuid_path_to_reveal, "", function(acc, part)
+					local current_path = utils.path_join(acc, part)
+					if #current_path > #uuid_path then
+						table.insert(context.paths_to_load, current_path)
+						table.insert(state.default_expanded_nodes, current_path)
+					end
+					return current_path
+				end)
+				context.paths_to_load = utils.unique(context.paths_to_load)
 			end
 		end
 		async_scan(context, uuid_path, name)

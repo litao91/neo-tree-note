@@ -2,6 +2,7 @@
 local cc = require("neo-tree.sources.common.commands")
 local utils = require("neo-tree.utils")
 local note = require("neo-tree-note")
+local events = require("neo-tree.events")
 local renderer = require("neo-tree.ui.renderer")
 local note_utils = require("neo-tree-note.lib.utils")
 local mainlibdb = require("neo-tree-note.lib.mainlibdb")
@@ -179,16 +180,10 @@ local function create_article(working_dir, cat_uuid, name)
 	return uuid
 end
 
-M.add = function(state, callback)
+M.add = function(state)
 	local tree = state.tree
 	local node = get_folder_node(tree)
 	local in_directory = node:get_id()
-	-- print(vim.inspect(in_directory))
-	-- print(vim.inspect(using_root_directory))
-	local path = mainlibdb.find_paths_to_cat_uuid(in_directory)
-	local uuid_path = path.uuid_path
-	local name_path = path.name_path
-	local base = table.concat(name_path, "/")
 
 	inputs.input('Enter name for new file or directory (dirs end with a "/"):', "", function(destination)
 		local is_cat = vim.endswith(destination, "/")
@@ -197,6 +192,11 @@ M.add = function(state, callback)
 		else
 			create_article(state.working_dir, in_directory, destination)
 		end
+
+		vim.schedule(function()
+			events.fire_event(events.FILE_ADDED, destination)
+			note.show_new_children(state, destination)
+		end)
 	end)
 end
 
