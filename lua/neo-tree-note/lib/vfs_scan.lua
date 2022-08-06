@@ -121,7 +121,7 @@ M.get_items = function(state, parent_uuid_path, parent_name, uuid_to_reveal, cal
 	root.loaded = true
 	root.search_pattern = state.search_pattern
 	context.categories[root.id] = root
-	state.default_expanded_nodes = state.force_open_folders or { state.path }
+	state.default_expanded_nodes = state.force_open_folders or { state.id }
 
 	-- job complete => show the nodes
 	context.job_complete = function()
@@ -168,7 +168,7 @@ M.get_items = function(state, parent_uuid_path, parent_name, uuid_to_reveal, cal
 					local current_path = utils.path_join(acc, part.uuid)
 					if #current_path > #uuid_path then
 						table.insert(context.paths_to_load, { uuid_path = current_path, name = part.name })
-						table.insert(state.default_expanded_nodes, { uuid_path = current_path, name = part.name })
+						table.insert(state.default_expanded_nodes, part.uuid)
 					end
 					return current_path
 				end)
