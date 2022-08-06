@@ -7,9 +7,10 @@ local renderer = require("neo-tree.ui.renderer")
 local note_utils = require("neo-tree-note.lib.utils")
 local mainlibdb = require("neo-tree-note.lib.mainlibdb")
 local inputs = require("neo-tree.ui.inputs")
-local luv = vim.loop
 
 local vim = vim
+local luv = vim.loop
+local api = vim.api
 
 local M = {}
 
@@ -199,6 +200,105 @@ M.add = function(state)
 			note.navigate(state, nil, dest_uuid)
 		end)
 	end)
+end
+
+local function clear_buffer(path)
+	local buf = utils.find_buffer_by_name(path)
+	if buf < 1 then
+		return
+	end
+	local alt = vim.fn.bufnr("#")
+	-- Check all windows to see if they are using the buffer
+	for _, win in ipairs(vim.api.nvim_list_wins()) do
+		if vim.api.nvim_win_get_buf(win) == buf then
+			-- if there is no alternate buffer yet, create a blank one now
+			if alt < 1 or alt == buf then
+				alt = vim.api.nvim_create_buf(true, false)
+			end
+			-- replace the buffer displayed in this window with the alternate buffer
+			vim.api.nvim_win_set_buf(win, alt)
+		end
+	end
+	local success, msg = pcall(vim.api.nvim_buf_delete, buf, { force = true })
+	if not success then
+		log.error("Could not clear buffer: ", msg)
+	end
+end
+
+local function delete_article(article_uuid, absolute_path)
+	mainlibdb.del_article(article_uuid)
+	local r = luv.fs_unlink(absolute_path)
+	if r then
+		clear_buffer(absolute_path)
+	end
+	return r
+end
+
+M.delete = function(state)
+	local tree = state.tree
+	local node = tree:get_node()
+	if node.type == "message" then
+		return
+	end
+	local uuid = node.id
+	local msg = string.format("Are you sure you want to delete '%s'?", node.name)
+	local _type = mainlibdb.get_node_type(uuid)
+	if _type == "directory" then
+		local children = mainlibdb.get_articles_by_cat(uuid)
+		if #children > 0 then
+			msg = "WARNING: Cat not empty! " .. msg
+		end
+	end
+	local do_delete = function(confirmed)
+		if not confirmed then
+			return
+		end
+		local function delete_cat(cat_uuid)
+			local sub_articles = mainlibdb.get_articles_by_cat(cat_uuid)
+			for _, node in ipairs(sub_articles) do
+				if node.uuid ~= nil then
+					local r = delete_article(node.uuid, utils.path_join(state.working_dir, "docs", node.uuid .. ".md"))
+					if not r then
+						return false
+					end
+				end
+			end
+
+			local sub_cats = mainlibdb.get_cat_by_pid(cat_uuid)
+			for _, node in ipairs(sub_cats) do
+				if node.uuid ~= nil then
+					delete_cat(node.uuid)
+				end
+			end
+
+			mainlibdb.del_cat(cat_uuid)
+			return true
+		end
+
+		if _type == "directory" then
+			local success = false
+			if utils.is_windows then
+				log.error("Windows is not supported")
+			end
+			success = delete_cat(uuid)
+			if not success then
+				return api.nvim_err_writeln("Could not remove category: " .. uuid)
+			end
+		else
+			local article_path = note_utils.get_article_file_path(state, uuid)
+			local success = delete_article(uuid, article_path)
+			if not success then
+				return api.nvim_err_writeln("Could not remove file: " .. article_path)
+			end
+			clear_buffer(article_path)
+		end
+		vim.schedule(function()
+			events.fire_event(events.FILE_DELETED, uuid)
+			note._navigate_internal(state, nil, nil, nil, false)
+		end)
+	end
+
+	inputs.confirm(msg, do_delete)
 end
 
 -- cc._add_common_commands(M)
