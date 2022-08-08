@@ -198,8 +198,8 @@ end
 ---@param config table Configuration table containing any keys that the user
 --wants to change from the defaults. May be empty to accept default values.
 M.setup = function(config, global_config)
-	local working_dir = config.working_dir or luv.working_dir
-	if not mainlibdb.init({ working_dir = working_dir }) then
+	config.working_dir = config.working_dir or luv.cwd()
+	if not mainlibdb.init({ working_dir = config.working_dir }) then
 		return
 	end
 

@@ -187,6 +187,9 @@ M.add = function(state)
 	local in_directory = node:get_id()
 
 	inputs.input('Enter name for new file or directory (dirs end with a "/"):', "", function(destination)
+		if not destination then
+			return
+		end
 		local is_cat = vim.endswith(destination, "/")
 		local dest_uuid
 		if is_cat then
@@ -195,6 +198,41 @@ M.add = function(state)
 			dest_uuid = create_article(state.working_dir, in_directory, destination)
 		end
 
+		vim.schedule(function()
+			events.fire_event(events.FILE_ADDED, dest_uuid)
+			note.navigate(state, nil, dest_uuid)
+		end)
+	end)
+end
+
+local function create_all_parents(in_dir_uuid, name_path)
+	local create_all_as_categories
+	local splits = utils.split(name_path, "/")
+	for _, split in ipairs(splits) do
+		local sub_cat_uuid = mainlibdb.find_sub_cat_uuid_by_name(in_dir_uuid, split)
+		if not sub_cat_uuid then
+			sub_cat_uuid = mainlibdb.add_cat(in_dir_uuid, split)
+		end
+		in_dir_uuid = sub_cat_uuid
+	end
+	return in_dir_uuid
+end
+
+M.add_directory = function(state)
+	local tree = state.tree
+	local node = get_folder_node(tree)
+	local in_directory = node:get_id()
+
+	inputs.input("Enter name for new directory:", "", function(dest_name)
+		if not dest_name then
+			return
+		end
+		local parent, name = utils.split_path(dest_name)
+		print(parent,name)
+		if parent then
+			in_directory = create_all_parents(in_directory, dest_name)
+		end
+		local dest_uuid = mainlibdb.add_cat(in_directory, name)
 		vim.schedule(function()
 			events.fire_event(events.FILE_ADDED, dest_uuid)
 			note.navigate(state, nil, dest_uuid)
@@ -244,9 +282,10 @@ M.delete = function(state)
 	local msg = string.format("Are you sure you want to delete '%s'?", node.name)
 	local _type = mainlibdb.get_node_type(uuid)
 	if _type == "directory" then
-		local children = mainlibdb.get_articles_by_cat(uuid)
-		if #children > 0 then
-			msg = "WARNING: Cat not empty! " .. msg
+		local children_articles = mainlibdb.get_articles_by_cat(uuid)
+		local children_cat = mainlibdb.get_cat_by_pid(uuid)
+		if #children_articles > 0 or #children_cat > 0 then
+			msg = "WARNING: Category not empty! " .. msg
 		end
 	end
 	local do_delete = function(confirmed)

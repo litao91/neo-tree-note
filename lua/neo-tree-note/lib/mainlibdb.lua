@@ -165,6 +165,17 @@ function M.find_paths_to_cat_uuid(cat_uuid)
 	end)
 end
 
+function M.find_sub_cat_uuid_by_name(in_uuid, name)
+	return init_or_get_db():with_open(function(db)
+		local r = db:eval("select uuid from cat where pid = " .. in_uuid .. " and name = '" .. name .. "'")
+		if type(r) ~= "boolean" and r[1] ~= nil and r[1].uuid ~= nil then
+			return r[1].uuid
+		else
+			return nil
+		end
+	end)
+end
+
 function M.has_inited()
 	return M.db == nil
 end
@@ -291,7 +302,7 @@ ORDER BY sort
         ]],
 			{ pid = pid }
 		)
-		if r == true then
+		if r == true or r[1] == nil or r[1].id == nil then
 			return {}
 		else
 			return r
@@ -354,7 +365,7 @@ LEFT JOIN article on cat_article.aid = article.uuid
 WHERE cat.uuid = ? ORDER BY article.sort desc]],
 			cat_uuid
 		)
-		if r == true then
+		if r == true or not r[1] or not r[1].id  then
 			return {}
 		else
 			return r
