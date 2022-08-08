@@ -235,7 +235,6 @@ M.add_directory = function(state)
 			dest_name = string.sub(dest_name, 1, #dest_name - 1)
 		end
 		local parent, name = utils.split_path(dest_name)
-		print(parent, name)
 		if parent then
 			in_directory = create_all_parents(in_directory, parent)
 		end

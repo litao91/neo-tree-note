@@ -21,7 +21,6 @@ function string:endswith(ending)
 end
 
 local test_is_in_path = function(lhs, rhs)
-	print(lhs, rhs)
 	if lhs == "0" then
 		return false
 	end
