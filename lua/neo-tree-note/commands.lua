@@ -206,7 +206,6 @@ M.add = function(state)
 end
 
 local function create_all_parents(in_dir_uuid, name_path)
-	local create_all_as_categories
 	local splits = utils.split(name_path, "/")
 	for _, split in ipairs(splits) do
 		local sub_cat_uuid = mainlibdb.find_sub_cat_uuid_by_name(in_dir_uuid, split)
@@ -227,10 +226,13 @@ M.add_directory = function(state)
 		if not dest_name then
 			return
 		end
+		if dest_name:endswith("/") then
+			dest_name = string.sub(dest_name, 1, #dest_name - 1)
+		end
 		local parent, name = utils.split_path(dest_name)
-		print(parent,name)
+		print(parent, name)
 		if parent then
-			in_directory = create_all_parents(in_directory, dest_name)
+			in_directory = create_all_parents(in_directory, parent)
 		end
 		local dest_uuid = mainlibdb.add_cat(in_directory, name)
 		vim.schedule(function()
