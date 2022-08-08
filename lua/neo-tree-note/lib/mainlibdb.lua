@@ -1,7 +1,6 @@
 local sqlite = require("sqlite.db")
 local M = {}
 local math = require("math")
-local note_utils = require("neo-tree-note.lib.utils")
 M.config = { working_dir = nil, uri = nil, db = nil }
 M.db = nil
 
