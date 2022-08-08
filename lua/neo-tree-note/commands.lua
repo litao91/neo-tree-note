@@ -181,30 +181,6 @@ local function create_article(working_dir, cat_uuid, name)
 	return uuid
 end
 
-M.add = function(state)
-	local tree = state.tree
-	local node = get_folder_node(tree)
-	local in_directory = node:get_id()
-
-	inputs.input('Enter name for new file or directory (dirs end with a "/"):', "", function(destination)
-		if not destination then
-			return
-		end
-		local is_cat = vim.endswith(destination, "/")
-		local dest_uuid
-		if is_cat then
-			dest_uuid = mainlibdb.add_cat(in_directory, destination.sub(destination, 1, #destination - 1))
-		else
-			dest_uuid = create_article(state.working_dir, in_directory, destination)
-		end
-
-		vim.schedule(function()
-			events.fire_event(events.FILE_ADDED, dest_uuid)
-			note.navigate(state, nil, dest_uuid)
-		end)
-	end)
-end
-
 local function create_all_parents(in_dir_uuid, name_path)
 	local splits = utils.split(name_path, "/")
 	for _, split in ipairs(splits) do
@@ -215,6 +191,35 @@ local function create_all_parents(in_dir_uuid, name_path)
 		in_dir_uuid = sub_cat_uuid
 	end
 	return in_dir_uuid
+end
+
+
+M.add = function(state)
+	local tree = state.tree
+	local node = get_folder_node(tree)
+	local in_directory = node:get_id()
+
+	inputs.input('Enter name for new file or directory (dirs end with a "/"):', "", function(destination)
+		if not destination then
+			return
+		end
+		local is_cat = vim.endswith(destination, "/")
+		local parent, new_name = utils.split_path(destination)
+		if parent then
+			in_directory = create_all_parents(in_directory, parent)
+		end
+		local dest_uuid
+		if is_cat then
+			dest_uuid = mainlibdb.add_cat(in_directory, string.sub(new_name, 1, #new_name - 1))
+		else
+			dest_uuid = create_article(state.working_dir, in_directory, new_name)
+		end
+
+		vim.schedule(function()
+			events.fire_event(events.FILE_ADDED, dest_uuid)
+			note.navigate(state, nil, dest_uuid)
+		end)
+	end)
 end
 
 M.add_directory = function(state)
