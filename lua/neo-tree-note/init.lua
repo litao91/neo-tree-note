@@ -200,7 +200,7 @@ end
 M.setup = function(config, global_config)
 	local working_dir = config.working_dir or luv.working_dir
 	if not mainlibdb.init({ working_dir = working_dir }) then
-		log.error("Fail to init mainlibdb with working dir: " .. working_dir)
+		return
 	end
 
 	-- Configure event handler for follow_current_file option

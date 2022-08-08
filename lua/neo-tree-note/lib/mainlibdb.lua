@@ -5,6 +5,21 @@ local note_utils = require("neo-tree-note.lib.utils")
 M.config = { working_dir = nil, uri = nil, db = nil }
 M.db = nil
 
+local init_or_get_db = function()
+	if M.db ~= nil then
+		return M.db
+	end
+	local luv = vim.loop
+	if not luv.fs_access(M.config.uri, "r") then
+		log.error("Fail to init db at " .. M.config.uri)
+		return nil
+	end
+	-- TODO: create enw db if not exists
+	M.db = sqlite:open(M.config.uri)
+	math.randomseed(os.clock() * 100000000000)
+	return M.db
+end
+
 function reverse(t)
 	local n = #t
 	local i = 1
@@ -16,7 +31,7 @@ function reverse(t)
 end
 
 function M.get_node_type(uuid)
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		local r1 = db:eval("select count(*) as cnt from cat where uuid = ?", uuid)
 		if r1 ~= nil and r1[1] ~= nil and r1[1].cnt > 0 then
 			return "directory"
@@ -41,7 +56,7 @@ function M.find_virtual_uuid_path(uuid)
 end
 
 function M.find_cat_of_article(article_uuid)
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		local r = db:eval(
 			[[
         select CAST(rid as text) as uuid from cat_article where aid = :article_uuid
@@ -57,7 +72,7 @@ function M.find_cat_of_article(article_uuid)
 end
 
 function M.find_virtual_uuid_path_of_article(article_uuid)
-	local path = M.db:with_open(function(db)
+	local path = init_or_get_db():with_open(function(db)
 		local r = db:eval(
 			[[
         select CAST(rid as text) as uuid from cat_article where aid = :article_uuid
@@ -81,7 +96,7 @@ function M.find_virtual_uuid_path_of_article(article_uuid)
 end
 
 function M.find_virtual_uuid_path_of_cat(cat_uuid)
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		local path = { cat_uuid }
 		local r = db:eval([[
                 select CAST(pid as TEXT) as uuid from cat where uuid =
@@ -102,7 +117,7 @@ function M.find_virtual_uuid_path_of_cat(cat_uuid)
 end
 
 function M.find_virtual_uuid_name_path_of_cat(cat_uuid)
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		local r = db:eval([[
                 select CAST(pid as TEXT) as pid, name from cat where uuid =
                 ]] .. cat_uuid)
@@ -124,7 +139,7 @@ function M.find_virtual_uuid_name_path_of_cat(cat_uuid)
 end
 
 function M.find_paths_to_cat_uuid(cat_uuid)
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		local r = db:eval([[
                 select CAST(pid as TEXT) as pid, name from cat where uuid =
                 ]] .. cat_uuid)
@@ -156,18 +171,8 @@ function M.has_inited()
 end
 
 function M.init(opts)
-	if M.db ~= nil then
-		return
-	end
 	M.config.working_dir = opts.working_dir
 	M.config.uri = opts.working_dir .. "/mainlib.db"
-	local luv = vim.loop
-	if not luv.fs_access(M.config.uri, "r") then
-		return false
-	end
-	-- TODO: create enw db if not exists
-	M.db = sqlite:open(M.config.uri)
-	math.randomseed(os.clock() * 100000000000)
 	return true
 end
 
@@ -176,7 +181,7 @@ function M.get_categories()
 end
 
 function M.get_cat_by_uuid(cat_uuid)
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		return db:eval(
 			[[
 SELECT
@@ -204,7 +209,7 @@ function M.update_category_of_article(article_uuid, new_cat_uuid)
 	if type(new_cat_uuid) == "string" then
 		new_cat_uuid = tonumber(new_cat_uuid)
 	end
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		return db:eval(
 			[[
         update cat_article
@@ -223,7 +228,7 @@ function M.rename_cat(uuid, pid, new_name)
 	if type(pid) == "string" then
 		pid = tonumber(pid)
 	end
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		return db:eval(
 			[[
         update cat
@@ -239,7 +244,7 @@ function M.get_cat_by_name_and_pid(cat_name, pid)
 	if type(pid) == "string" then
 		pid = tonumber(pid)
 	end
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		local r = db:eval(
 			[[
 SELECT
@@ -269,7 +274,7 @@ function M.get_cat_by_pid(pid)
 	if type(pid) == "string" then
 		pid = tonumber(pid)
 	end
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		local r = db:eval(
 			[[
 SELECT
@@ -299,7 +304,7 @@ function M.get_article_by_uuid(aid)
 	if type(aid) == "string" then
 		aid = tonumber(aid)
 	end
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		return db:eval(
 			[[
 SELECT
@@ -327,7 +332,7 @@ function M.get_articles_by_cat(cat_uuid)
 	if type(cat_uuid) == "string" then
 		cat_uuid = tonumber(cat_uuid)
 	end
-	return M.db:with_open(function(db)
+	return init_or_get_db():with_open(function(db)
 		local r = db:eval(
 			[[
 SELECT
@@ -369,7 +374,7 @@ function M.add_cat(pid, cat_name)
 		pid = tonumber(pid)
 	end
 	local uuid = gen_uuid()
-	M.db:with_open(function(db)
+	init_or_get_db():with_open(function(db)
 		local max_sort = db:eval("SELECT MAX(sort) as max_sort FROM cat")[1]
 
 		if max_sort == nil then
@@ -423,7 +428,7 @@ function M.add_article(pid)
 	end
 	local now = os.time(os.date("!*t"))
 	local uuid = gen_uuid()
-	M.db:with_open(function(db)
+	init_or_get_db():with_open(function(db)
 		db:eval(
 			[[
         INSERT INTO article(
@@ -452,7 +457,7 @@ function M.del_article(article_uuid)
 	if type(article_uuid) == "string" then
 		article_uuid = tonumber(article_uuid)
 	end
-	M.db:with_open(function(db)
+	init_or_get_db():with_open(function(db)
 		db:eval("DELETE from cat_article WHERE aid = :aid", { aid = article_uuid })
 		db:eval("DELETE FROM article where uuid = :aid", { aid = article_uuid })
 	end)
@@ -461,7 +466,7 @@ function M.del_cat(cat_uuid)
 	if type(cat_uuid) == "string" then
 		cat_uuid = tonumber(cat_uuid)
 	end
-	M.db:with_open(function(db)
+	init_or_get_db():with_open(function(db)
 		db:eval("DELETE from cat_article WHERE rid = :rid", { rid = cat_uuid })
 		db:eval("DELETE from cat WHERE uuid = :rid", { rid = cat_uuid })
 	end)
