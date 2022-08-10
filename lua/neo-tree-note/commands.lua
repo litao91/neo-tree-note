@@ -30,8 +30,8 @@ M.toggle_node = function(state)
 	cc.toggle_node(state, utils.wrap(note.toggle_category, state))
 end
 
-local open_article = function(state, uuid_path, cmd, open_file)
-	local real_path = note_utils.get_article_file_path(state, uuid_path)
+local open_article = function(state, uuid, cmd, open_file)
+	local real_path = note_utils.get_article_file_path(state, uuid)
 	if type(open_file) == "function" then
 		open_file(state, real_path, cmd)
 	else

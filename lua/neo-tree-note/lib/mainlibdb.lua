@@ -165,9 +165,28 @@ function M.find_paths_to_cat_uuid(cat_uuid)
 	end)
 end
 
+function M.find_parent_uuid(uuid)
+	local node_type = M.get_node_type(uuid)
+	if node_type == "directory" then
+		if uuid == "0" then
+			return nil
+		end
+		return init_or_get_db():with_open(function(db)
+			local r = db:eval("select CAST(pid as TEXT) as pid from cat where uuid = " .. uuid)
+			if type(r) ~= "boolean" and r[1] ~= nil and r[1].pid ~= nil then
+				return r[1].pid
+			else
+				return "0"
+			end
+		end)
+	else
+		return M.find_cat_of_article(uuid)
+	end
+end
+
 function M.find_sub_cat_uuid_by_name(in_uuid, name)
 	return init_or_get_db():with_open(function(db)
-		local r = db:eval("select uuid from cat where pid = " .. in_uuid .. " and name = '" .. name .. "'")
+		local r = db:eval("select CAST(uuid as TEXT) as uuid from cat where pid = " .. in_uuid .. " and name = '" .. name .. "'")
 		if type(r) ~= "boolean" and r[1] ~= nil and r[1].uuid ~= nil then
 			return r[1].uuid
 		else
@@ -365,7 +384,7 @@ LEFT JOIN article on cat_article.aid = article.uuid
 WHERE cat.uuid = ? ORDER BY article.sort desc]],
 			cat_uuid
 		)
-		if r == true or not r[1] or not r[1].id  then
+		if r == true or not r[1] or not r[1].id then
 			return {}
 		else
 			return r

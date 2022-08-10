@@ -1,18 +1,15 @@
 local utils = require("neo-tree.utils")
 
+local mainlibdb = require("neo-tree-note.lib.mainlibdb")
 local create_item, set_parents
 
-function create_item(context, uuid_path, name, _type)
-	local uuid_parent, uuid = utils.split_path(uuid_path)
+function create_item(context, uuid, name, _type)
 	if context.categories[uuid] then
 		return context.categories[uuid]
 	end
 	local item = {
 		id = uuid,
 		name = name,
-		uuid_parent = uuid_parent,
-		uuid_path = uuid_path,
-		path = uuid_path,
 		type = _type,
 	}
 	if item.type == "directory" then
@@ -27,7 +24,7 @@ function create_item(context, uuid_path, name, _type)
 	if not context.all_items then
 		context.all_items = {}
 	end
-	local is_not_root = (uuid_path ~= "0")
+	local is_not_root = (uuid ~= "0")
 	if is_not_root then
 		table.insert(context.all_items, item)
 	end
@@ -36,7 +33,7 @@ end
 
 local function sort_items(a, b)
 	if a.type == b.type then
-		return a.path < b.path
+		return a.name < b.name
 	else
 		return a.type < b.type
 	end
@@ -92,18 +89,22 @@ function set_parents(context, item)
 	if context.item_exists[item.id] then
 		return
 	end
-	if not item.uuid_path then
-		return
-	end
 
-	local parent = context.categories[get_name(item.uuid_parent)]
-	-- parent already created
-	if not utils.truthy(item.uuid_parent) then
+	local parent_uuid = mainlibdb.find_parent_uuid(item.id)
+	require'neo-tree.log'.trace("parent of " .. item.id .. " " .. vim.inspect(parent_uuid))
+	if not parent_uuid then
 		return
 	end
+	local parent = context.categories[parent_uuid]
+	-- parent already created
 	if parent == nil then
 		local success
-		success, parent = pcall(create_item, context, item.uuid_parent, item.name_parent, "directory")
+		local parent_name = "/"
+		if parent_uuid ~= "0" then
+			local parent_obj = mainlibdb.get_cat_by_uuid(parent_uuid)
+			parent_name = parent_obj.name
+		end
+		success, parent = pcall(create_item, context, parent_uuid, parent_name, "directory")
 		if not success then
 			log.error("error creating item for ", item.name_parent)
 		end

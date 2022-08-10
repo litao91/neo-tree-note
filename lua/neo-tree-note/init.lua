@@ -133,10 +133,17 @@ M._navigate_internal = function(state, uuid, uuid_to_reveal, callback, async)
 	state.dirty = false
 	local is_search = utils.truthy(state.search_pattern)
 	log.trace("navigate_internal", state.current_position, uuid, uuid_to_reveal)
-	state.uuid_path = "0"
+	state.uuid = "0"
 	state.name = "/"
+
 	if uuid_to_reveal then
 		renderer.position.set(state, uuid_to_reveal)
+		log.debug(
+			"navigate_internal: in path_to_reveal, state.position is ",
+			state.position.node_id,
+			", restorable = ",
+			state.position.is.restorable
+		)
 		vfs_scan.get_items(state, nil, nil, uuid_to_reveal, callback)
 	else
 		local is_current = state.current_position == "current"
@@ -160,8 +167,8 @@ M._navigate_internal = function(state, uuid, uuid_to_reveal, callback, async)
 	end
 end
 
-M.toggle_category = function(state, node, path_to_reveal, skip_redraw, recursive)
-	log.debug("toggle_directory", state, node, path_to_reveal, skip_redraw, recursive)
+M.toggle_category = function(state, node, uuid_to_reveal, skip_redraw, recursive)
+	log.debug("toggle_directory", state, node, uuid_to_reveal, skip_redraw, recursive)
 	local tree = state.tree
 	if not node then
 		node = tree:get_node()
@@ -170,11 +177,11 @@ M.toggle_category = function(state, node, path_to_reveal, skip_redraw, recursive
 		return
 	end
 	state.explicitly_opened_directories = state.explicitly_opened_directories or {}
-	if node.loaded == false then
+	if not node.loaded then
 		local id = node:get_id()
 		state.explicitly_opened_directories[id] = true
 		renderer.position.set(state, nil)
-		vfs_scan.get_items(state, id, node.name, path_to_reveal, nil, false, recursive)
+		vfs_scan.get_items(state, id, node.name, uuid_to_reveal, nil, false, recursive)
 	elseif node:has_children() then
 		local updated = false
 		if node:is_expanded() then
@@ -187,8 +194,8 @@ M.toggle_category = function(state, node, path_to_reveal, skip_redraw, recursive
 		if updated and not skip_redraw then
 			renderer.redraw(state)
 		end
-		if path_to_reveal then
-			renderer.focus_node(state, path_to_reveal)
+		if uuid_to_reveal then
+			renderer.focus_node(state, uuid_to_reveal)
 		end
 	end
 end
