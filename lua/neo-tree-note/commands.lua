@@ -210,7 +210,7 @@ M.add = function(state)
 		end
 		local dest_uuid
 		if is_cat then
-			dest_uuid = mainlibdb.add_cat(in_directory, string.sub(new_name, 1, #new_name - 1))
+			dest_uuid = mainlibdb.add_cat(in_directory, new_name)
 		else
 			dest_uuid = create_article(state.working_dir, in_directory, new_name)
 		end
