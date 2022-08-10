@@ -19,6 +19,8 @@ function create_item(context, uuid, name, _type)
 		if context.state.search_pattern then
 			table.insert(context.state.default_expanded_nodes, item.id)
 		end
+	else
+		item.ext = "md"
 	end
 	set_parents(context, item)
 	if not context.all_items then

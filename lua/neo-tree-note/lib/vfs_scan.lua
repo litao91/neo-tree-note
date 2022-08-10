@@ -49,30 +49,26 @@ local get_article_title = function(context, uuid)
 	return title
 end
 
-local function async_scan(context, uuid, name)
-	log.trace("async_scan: ", uuid, name)
+local function scan(context, uuid, name)
+	log.trace("scan: ", uuid, name)
 	-- prepend the root path
 	table.insert(context.paths_to_load, 1, { uuid = uuid, name = name })
 
-	local categories_scanned = 0
-	local categories_to_scan = #context.paths_to_load
-
-	local on_exit = vim.schedule_wrap(function()
-		context.job_complete()
-	end)
+	context.categories_scanned = 0
+	context.categories_to_scan = #context.paths_to_load
 
 	-- from https://github.com/nvim-lua/plenary.nvim/blob/master/lua/plenary/scandir.lua
-	local function read_cat(cur_cat_uuid, current_name)
+	local function read_cat(cur_cat_uuid, current_name, ctx)
 		local sub_cats = mainlibdb.get_cat_by_pid(cur_cat_uuid)
 		local sub_articles = mainlibdb.get_articles_by_cat(cur_cat_uuid)
 		for _, node in ipairs(sub_cats) do
 			if node.uuid ~= nil then
-				-- note_items.create_item(context, node.uuid, node.name, "directory")
-				local success, item = pcall(note_items.create_item, context, node.uuid, node.name, "directory")
+				-- note_items.create_item(ctx, node.uuid, node.name, "directory")
+				local success, item = pcall(note_items.create_item, ctx, node.uuid, node.name, "directory")
 				if success then
-					if context.recursive then
-						categories_to_scan = categories_to_scan + 1
-						read_cat(item.uuid_path, item.name)
+					if ctx.recursive then
+						ctx.categories_to_scan = ctx.categories_to_scan + 1
+						table.insert(ctx.paths_to_load, { uuid = item.id, name = item.name })
 					end
 				else
 					log.error("Error creating dir from ", current_name)
@@ -81,19 +77,17 @@ local function async_scan(context, uuid, name)
 		end
 		for _, node in ipairs(sub_articles) do
 			if node and node.uuid then
-				if node.uuid ~= nil then
-					local title = get_article_title(context, node.uuid)
-					local success, _ = pcall(note_items.create_item, context, node.uuid, title, "file")
-					if not success then
-						log.error("Error creating file from ", node.name)
-					end
+				local title = get_article_title(ctx, node.uuid)
+				local success, _ = pcall(note_items.create_item, ctx, node.uuid, title, "file")
+				if not success then
+					log.error("Error creating file from ", node.name)
 				end
 			end
 		end
-		on_category_loaded(context, cur_cat_uuid)
-		categories_scanned = categories_scanned + 1
-		if categories_scanned == #context.paths_to_load then
-			on_exit()
+		on_category_loaded(ctx, cur_cat_uuid)
+		ctx.categories_scanned = ctx.categories_scanned + 1
+		if ctx.categories_scanned == #ctx.paths_to_load then
+			context.job_complete()
 		end
 	end
 
@@ -102,8 +96,8 @@ local function async_scan(context, uuid, name)
 	--if not success then
 	--  log.error(first, ": ", err)
 	--end
-	for i = 1, categories_to_scan do
-		read_cat(context.paths_to_load[i].uuid, context.paths_to_load[i].name)
+	for i = 1, context.categories_to_scan do
+		read_cat(context.paths_to_load[i].uuid, context.paths_to_load[i].name, context)
 	end
 end
 
@@ -168,7 +162,7 @@ M.get_items = function(state, parent_uuid, parent_name, uuid_to_reveal, callback
 				context.paths_to_load = utils.unique(context.paths_to_load)
 			end
 		end
-		async_scan(context, uuid, name)
+		scan(context, uuid, name)
 	end
 end
 
