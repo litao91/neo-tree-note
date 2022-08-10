@@ -48,6 +48,27 @@ local get_article_title = function(context, uuid)
 	title = string.gsub(title, "^#+ ", "")
 	return title
 end
+-- job complete => show the nodes
+local job_complete = function(context)
+	local state = context.state
+	local root = context.root
+	local parent_id = context.parent_id
+	note_items.deep_sort(root.children)
+	if parent_id then
+		-- lazy loading a child folder
+		renderer.show_nodes(root.children, state, parent_id, context.callback)
+	else
+		-- full render of the tree
+		renderer.show_nodes({ root }, state, nil, context.callback)
+	end
+
+	context.state = nil
+	context.callback = nil
+	context.all_items = nil
+	context.root = nil
+	context.parent_id = nil
+	context = nil
+end
 
 local function scan(context, uuid, name)
 	log.trace("scan: ", uuid, name)
@@ -87,7 +108,7 @@ local function scan(context, uuid, name)
 		on_category_loaded(ctx, cur_cat_uuid)
 		ctx.categories_scanned = ctx.categories_scanned + 1
 		if ctx.categories_scanned == #ctx.paths_to_load then
-			context.job_complete()
+			job_complete(ctx)
 		end
 	end
 
@@ -103,27 +124,19 @@ end
 
 M.get_items = function(state, parent_uuid, parent_name, uuid_to_reveal, callback, async, recursive)
 	local context = note_items.create_context(state)
+	context.state = state
+	context.parent_id = parent_uuid
 	context.uuid_to_reveal = uuid_to_reveal
 	context.recursive = recursive
+	context.callback = callback
 
 	-- Create root folder
 	local root = note_items.create_item(context, parent_uuid or state.uuid, parent_name or state.name, "directory")
 	root.loaded = true
 	root.search_pattern = state.search_pattern
+	context.root = root
 	context.categories[root.id] = root
 	state.default_expanded_nodes = state.force_open_folders or { state.id }
-
-	-- job complete => show the nodes
-	context.job_complete = function()
-		note_items.deep_sort(root.children)
-		if parent_uuid then
-			-- lazy loading a child folder
-			renderer.show_nodes(root.children, state, parent_uuid, callback)
-		else
-			-- full render of the tree
-			renderer.show_nodes({ root }, state, nil, callback)
-		end
-	end
 
 	if state.search_pattern then
 		log.error("Unimplemented")
