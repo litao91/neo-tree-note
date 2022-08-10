@@ -193,7 +193,6 @@ local function create_all_parents(in_dir_uuid, name_path)
 	return in_dir_uuid
 end
 
-
 M.add = function(state)
 	local tree = state.tree
 	local node = get_folder_node(tree)
@@ -285,6 +284,7 @@ M.delete = function(state)
 		return
 	end
 	local uuid = node.id
+
 	local msg = string.format("Are you sure you want to delete '%s'?", node.name)
 	local _type = mainlibdb.get_node_type(uuid)
 	if _type == "directory" then
@@ -321,11 +321,7 @@ M.delete = function(state)
 		end
 
 		if _type == "directory" then
-			local success = false
-			if utils.is_windows then
-				log.error("Windows is not supported")
-			end
-			success = delete_cat(uuid)
+			local success = delete_cat(uuid)
 			if not success then
 				return api.nvim_err_writeln("Could not remove category: " .. uuid)
 			end
