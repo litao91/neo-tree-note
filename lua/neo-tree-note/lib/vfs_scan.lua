@@ -74,12 +74,14 @@ local function scan(context, uuid, name)
 	log.trace("scan: ", uuid, name)
 	-- prepend the root path
 	table.insert(context.paths_to_load, 1, { uuid = uuid, name = name })
+	-- print("p to load" .. vim.inspect(context.paths_to_load))
 
 	context.categories_scanned = 0
 	context.categories_to_scan = #context.paths_to_load
 
 	-- from https://github.com/nvim-lua/plenary.nvim/blob/master/lua/plenary/scandir.lua
 	local function read_cat(cur_cat_uuid, current_name, ctx)
+		-- print(cur_cat_uuid, current_name)
 		local sub_cats = mainlibdb.get_cat_by_pid(cur_cat_uuid)
 		local sub_articles = mainlibdb.get_articles_by_cat(cur_cat_uuid)
 		for _, node in ipairs(sub_cats) do
@@ -151,10 +153,20 @@ M.get_items = function(state, parent_uuid, parent_name, uuid_to_reveal, callback
 		if parent_uuid == nil then
 			if utils.truthy(state.force_open_folders) then
 				for _, f in ipairs(state.force_open_folders) do
-					table.insert(context.paths_to_load, f)
+					local cat_obj = mainlibdb.get_cat_by_uuid(f)
+					if cat_obj then
+						table.insert(context.paths_to_load, { uuid = uuid, name = cat_obj.name })
+					end
 				end
 			elseif state.tree then
-				context.paths_to_load = renderer.get_expanded_nodes(state.tree, uuid)
+				local expanded = renderer.get_expanded_nodes(state.tree, uuid)
+				-- TODO: faster with batch query
+				for _, expanded_uuid in ipairs(expanded) do
+					local cat_obj = mainlibdb.get_cat_by_uuid(expanded_uuid)
+					if cat_obj then
+						table.insert(context.paths_to_load, { uuid = expanded_uuid, name = cat_obj.name })
+					end
+				end
 			end
 			if uuid_to_reveal then
 				local cat_of_article = mainlibdb.find_cat_of_article(uuid_to_reveal)
@@ -167,12 +179,12 @@ M.get_items = function(state, parent_uuid, parent_name, uuid_to_reveal, callback
 					table.remove(uuid_path_to_reveal)
 				end
 				utils.reduce(uuid_path_to_reveal, "", function(acc, part)
-					local current_path = utils.path_join(acc, part.uuid)
-					table.insert(context.paths_to_load, { uuid_path = current_path, name = part.name })
+					-- local current_path = utils.path_join(acc, part.uuid)
+					table.insert(context.paths_to_load, { uuid = part.uuid, name = part.name })
 					table.insert(state.default_expanded_nodes, part.uuid)
-					return current_path
 				end)
 				context.paths_to_load = utils.unique(context.paths_to_load)
+				-- print("paths to load", vim.inspect(context.paths_to_load))
 			end
 		end
 		scan(context, uuid, name)

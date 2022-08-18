@@ -53,7 +53,7 @@ local follow_internal = function(callback, force_show, async)
 		return false
 	end
 
-	if not state.uuid_path then
+	if not state.uuid then
 		return false
 	end
 
@@ -61,7 +61,7 @@ local follow_internal = function(callback, force_show, async)
 	if window_exists then
 		local node = state.tree and state.tree:get_node()
 		if node then
-			if node:get_id() == path_to_reveal then
+			if node:get_id() == uuid_to_reveal then
 				-- already focused
 				return false
 			end
@@ -168,7 +168,6 @@ M._navigate_internal = function(state, uuid, uuid_to_reveal, callback, async)
 end
 
 M.toggle_category = function(state, node, uuid_to_reveal, skip_redraw, recursive)
-	log.debug("toggle_directory", state, node, uuid_to_reveal, skip_redraw, recursive)
 	local tree = state.tree
 	if not node then
 		node = tree:get_node()

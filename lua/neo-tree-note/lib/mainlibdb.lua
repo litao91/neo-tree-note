@@ -117,9 +117,7 @@ end
 
 function M.find_virtual_uuid_name_path_of_cat(cat_uuid)
 	return init_or_get_db():with_open(function(db)
-		local r = db:eval([[
-                select CAST(pid as TEXT) as pid, name from cat where uuid =
-                ]] .. cat_uuid)
+		local r = db:eval("select CAST(pid as TEXT) as pid, name from cat where uuid =" .. cat_uuid)
 		local path = { { uuid = cat_uuid } }
 		while true do
 			if type(r) ~= "boolean" and r[1] ~= nil and r[1].pid ~= nil then
@@ -131,6 +129,9 @@ function M.find_virtual_uuid_name_path_of_cat(cat_uuid)
 			else
 				break
 			end
+		end
+		if path[#path].uuid == "0" then
+			path[#path].name = "/"
 		end
 		reverse(path)
 		return path
@@ -172,7 +173,7 @@ function M.find_parent_uuid(uuid)
 			return nil
 		end
 		return init_or_get_db():with_open(function(db)
-			local r = db:eval("select CAST(pid as TEXT) as pid from cat where uuid = " .. uuid)
+			local r = db:eval("select CAST(pid as TEXT) as pid from cat where uuid =  " .. uuid)
 			if type(r) ~= "boolean" and r[1] ~= nil and r[1].pid ~= nil then
 				return r[1].pid
 			else
@@ -211,7 +212,7 @@ end
 
 function M.get_cat_by_uuid(cat_uuid)
 	return init_or_get_db():with_open(function(db)
-		return db:eval(
+		local r = db:eval(
 			[[
 SELECT
     id,
@@ -228,6 +229,11 @@ ORDER BY sort
         ]],
 			{ uuid = cat_uuid }
 		)
+		if type(r) ~= "table" then
+			return nil
+		else
+			return r
+		end
 	end)
 end
 

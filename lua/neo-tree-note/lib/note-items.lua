@@ -83,10 +83,7 @@ local function deep_sort(tbl, sort_func)
 		end
 	end
 end
-function get_name(path)
-	local _, uuid = utils.split_path(path)
-	return uuid
-end
+
 function set_parents(context, item)
 	if context.item_exists[item.id] then
 		return
