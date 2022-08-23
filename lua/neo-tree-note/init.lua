@@ -134,7 +134,8 @@ M._navigate_internal = function(state, uuid, uuid_to_reveal, callback, async)
 	local is_search = utils.truthy(state.search_pattern)
 	log.trace("navigate_internal", state.current_position, uuid, uuid_to_reveal)
 	state.uuid = "0"
-	state.name = "/"
+	-- state.id = "0"
+	-- state.name = "/"
 
 	if uuid_to_reveal then
 		renderer.position.set(state, uuid_to_reveal)
