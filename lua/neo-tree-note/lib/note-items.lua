@@ -34,16 +34,36 @@ function create_item(context, uuid, name, _type)
 end
 
 local function sort_items(a, b)
+	local function padnum(d)
+		local dec, n = string.match(d, "(%.?)0*(.+)")
+		return #dec > 0 and ("%.12f"):format(d) or ("%s%03d%s"):format(dec, #n, n)
+	end
+
 	if a.type == b.type then
-		return a.name < b.name
+		return tostring(a.name):gsub("%.?%d+", padnum) .. ("%3d"):format(#b)
+			< tostring(b.name):gsub("%.?%d+", padnum) .. ("%3d"):format(#a)
 	else
 		return a.type < b.type
 	end
 end
 
+-- local function sort_items(a, b)
+-- 	if a.type == b.type then
+-- 		return a.name < b.name
+-- 	else
+-- 		return a.type < b.type
+-- 	end
+-- end
+
 local function sort_items_case_insensitive(a, b)
+	local function padnum(d)
+		local dec, n = string.match(d, "(%.?)0*(.+)")
+		return #dec > 0 and ("%.12f"):format(d) or ("%s%03d%s"):format(dec, #n, n)
+	end
+
 	if a.type == b.type then
-		return a.path:lower() < b.path:lower()
+		return tostring(a.name:lower()):gsub("%.?%d+", padnum) .. ("%3d"):format(#b)
+			< tostring(b.name:lower()):gsub("%.?%d+", padnum) .. ("%3d"):format(#a)
 	else
 		return a.type < b.type
 	end
@@ -65,6 +85,7 @@ local function sort_function_is_valid(func)
 	log.error("sort function isn't valid ", result)
 	return false
 end
+
 local function deep_sort(tbl, sort_func)
 	if sort_func == nil then
 		local config = require("neo-tree").config
@@ -90,7 +111,7 @@ function set_parents(context, item)
 	end
 
 	local parent_uuid = mainlibdb.find_parent_uuid(item.id)
-	require'neo-tree.log'.trace("parent of " .. item.id .. " " .. vim.inspect(parent_uuid))
+	require("neo-tree.log").trace("parent of " .. item.id .. " " .. vim.inspect(parent_uuid))
 	if not parent_uuid then
 		return
 	end
